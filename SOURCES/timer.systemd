@@ -1,0 +1,8 @@
+[Unit]
+Description=Validação de repositórios
+
+[Timer]
+OnUnitActiveSec=24hours
+
+[Install]
+WantedBy=timers.target

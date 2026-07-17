@@ -1,0 +1,2 @@
+enable bbrepoman.service
+enable bbrepoman.timer
