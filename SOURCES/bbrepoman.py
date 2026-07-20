@@ -51,18 +51,49 @@ class RepoCache():
         return 
  
     def get_saved_checksums(self, dir):
-        regex_checksums=r"(.*) \*?(.*)"
+        regex_checksums = r"(.*) \*?(.*)"
+        match_dict = {}
+    
+        # Novo formato
+        ckdir = os.path.join(self.configdir, dir + '.sha1sum.d')
+    
+        if os.path.isdir(ckdir):
+            for filename in sorted(os.listdir(ckdir)):
+                filepath = os.path.join(ckdir, filename)
+    
+                if not os.path.isfile(filepath):
+                    continue
+                
+                with open(filepath, 'r') as f:
+                    ck_content = f.read()
+    
+                matches_checksums = re.findall(
+                    regex_checksums,
+                    ck_content,
+                    re.MULTILINE
+                )
+    
+                for item in matches_checksums:
+                    match_dict[item[1]] = item[0].strip()
+    
+            return match_dict
+    
+        # Formato legado
         ckfile = os.path.join(self.configdir, dir + '.sha1sum')
+    
         if os.path.isfile(ckfile):
             with open(ckfile, 'r') as f:
-                ck_content=f.read()
-            matches_checksums = re.findall(regex_checksums, ck_content, re.MULTILINE)
-        else:
-            return {}
-        match_dict = {}
-        for item in matches_checksums:
-            match_dict[item[1]] = item[0].strip(' ')
-        
+                ck_content = f.read()
+    
+            matches_checksums = re.findall(
+                regex_checksums,
+                ck_content,
+                re.MULTILINE
+            )
+    
+            for item in matches_checksums:
+                match_dict[item[1]] = item[0].strip()
+    
         return match_dict
 
     def get_saved_distro_info(self, dir):   
