@@ -436,7 +436,10 @@ class RepoCache():
     
     def get_checksum_catalogs(self, distro):
         basedir_system='/srv/www' + self.distros[distro]['install_path'].rstrip('/').rpartition('/')[0]
+        print(f'Install path: {basedir_system}')
         basedir_other=basedir_system.rstrip('/').rpartition('/')[0].rpartition('/')[0]
+        print(f'basedir_other: {basedir_other}')
+      
         if distro not in self.distros.keys():
             print(f'*** {self.color("ERRO", "red")} ***: "{distro}" não consta da lista de distros conhecidas.')
             return None
@@ -461,7 +464,7 @@ class RepoCache():
                 else:
                     # print(os.path.basename(f['filename']).partition('-')[0])
                     repositorio = str(os.path.basename(f['filename']).partition('-')[0].partition('.')[0])
-                    # print(f'Repositorio: {repositorio} , Distro {distro}')
+                    print(f'Repositorio: {repositorio} , Distro {distro}')
                     
                     if repositorio == "install" or repositorio == "backports":
                             filename = os.path.join(os.path.join(basedir_other,"sistema",distro_path,os.path.basename(f['filename']).partition('-')[0].partition('.')[0]+'-x86_64'), 'CHECKSUMS')
@@ -471,7 +474,9 @@ class RepoCache():
                             filename = os.path.join(os.path.join(basedir_other,"sistema",distro_path,"SLE-Module-Packagehub-Subpackages-x86_64"), 'CHECKSUMS')
                     else:
                             filename = os.path.join(os.path.join(basedir_other,"bb",os.path.basename(f['filename']).partition('-')[0].partition('.')[0]), 'CHECKSUMS')
-
+                    #         
+                    # filename = os.path.join(os.path.join(basedir_other,os.path.basename(f['filename']).partition('-')[0].partition('.')[0]), 'CHECKSUMS')
+                    filename = os.path.join(os.path.join(basedir_system,os.path.basename(f['filename']).partition('-')[0].partition('.')[0]), 'CHECKSUMS')
                     if os.path.exists(filename):
                         print(f'---> Achei catálogo no arquivo: {filename}')
                         catalogs.append(filename)
