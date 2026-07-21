@@ -390,7 +390,7 @@ class RepoCache():
             # verifica se o arquivo de checksums foi incluido no repositório
             catalogs,missing_catalogs=self.get_checksum_catalogs(distro)
             if (len(missing_catalogs) > 0):
-                print(f'---> Alguns repositórios não possuem checksums, gerando catálogos...')
+                print(f'---> Alguns repositórios não possuem checksums, gerando catálogos SHA1...')
                 self.generate_checksum_catalogs(distro, missing_catalogs)
             
         except Exception as e:
@@ -410,10 +410,12 @@ class RepoCache():
                 # gera o arquivo de checksums
                 print(f'Gerando catálogo SHA1SUM faltante em {f}...')
                 os.chdir(os.path.dirname(f))                
-                # files = [f for f in pathlib.Path(".").rglob("*") if f.is_file()]
                 files = [
                     f for f in pathlib.Path(".").rglob("*")
-                    if f.is_file() and f.suffix.lower() == ".rpm"
+                    if (
+                        f.is_file()
+                        and f.name != "CHECKSUMS"
+                    )
                 ]
                 with tqdm(total=len(files), position=1, unit='files') as pbar:
                     for p in files:
