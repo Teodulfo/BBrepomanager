@@ -619,7 +619,7 @@ class RepoCache():
                 
         pbar_files.close()
         return True
-           
+
     def verify_checksums(self, distro_name):
         # verifica o cache para a distro selecionada...
         print(f"* PRIMEIRA FASE: integridade do cache")
@@ -630,6 +630,63 @@ class RepoCache():
         else:
             return False
         
+
+    def verify_archive(self, filename):
+        if not os.path.isfile(filename):
+            return False
+
+        try:
+            if filename.endswith('.zip'):
+                cmd = [
+                    '/usr/bin/unzip',
+                    '-t',
+                    filename
+                ]
+
+            elif filename.endswith('.tar.gz') or filename.endswith('.tgz'):
+                cmd = [
+                    '/usr/bin/tar',
+                    '-tzf',
+                    filename
+                ]
+
+            elif filename.endswith('.tar'):
+                cmd = [
+                    '/usr/bin/tar',
+                    '-tf',
+                    filename
+                ]
+
+            else:
+                return True
+
+            result = subprocess.run(
+                cmd,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE
+            )
+
+            if result.returncode != 0:
+                print(
+                    f'*** ERRO *** arquivo compactado inválido: {filename}'
+                )
+                print(result.stderr.decode())
+                return False
+
+            print(
+                f'Arquivo compactado íntegro: {filename} ({self.color("OK","green")})'
+            )
+
+            return True
+
+        except Exception as e:
+            print(
+                f'*** ERRO *** ao testar arquivo compactado {filename}: {e}'
+            )
+            return False
+
+
+
     def verify_cache_checksums(self, distro_name):
 
         if distro_name not in self.distros.keys():
@@ -650,6 +707,11 @@ class RepoCache():
                     print(f"SHA1: {item['filename']} {item['calculated_checksum']} ({self.color('OK', 'green')})")
                     # atualiza o timestamp
                     self.distros[distro_name]['timestamp_cache'] = datetime.now()
+                    # Teste de integridade dos Arquivos Repositórios no Cache.
+                    fullpath = os.path.join(self.distros[distro_name]['path'],item['filename'])
+                    if not self.verify_archive(fullpath):
+                        failed = True
+                        print(f'*** {self.color("ARQUIVO COMPACTADO CORROMPIDO", "red")} ***')
                     
                 print()
                 # atualiza o timestamp
