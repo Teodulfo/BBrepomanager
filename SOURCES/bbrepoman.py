@@ -382,11 +382,42 @@ class RepoCache():
             for f in self.distros[distro]['files']:
                 print(f'---> Descompactando arquivo: {f["filename"]} ({f["size"]} bytes)')
                 filename = os.path.join(self.distros[distro]['path'], f['filename'])
+                # if filename.endswith('.zip'):
+                #     self.extract_zipfile(filename, destination)
+                # elif filename.endswith('.tar.gz') or filename.endswith('.tgz'):
+                #     self.extract_tarfile(filename, destination)
                 if filename.endswith('.zip'):
-                    self.extract_zipfile(filename, destination)
-                elif filename.endswith('.tar.gz') or filename.endswith('.tgz'):
-                    self.extract_tarfile(filename, destination)
-            
+
+                    if self.zip_has_structure(filename):
+                    
+                        print('---> Estrutura antiga detectada')
+
+                        self.extract_zipfile(filename,destination)
+
+                    else:
+                        print('---> Estrutura nova detectada')
+
+                        target = self.create_repo_target(distro,filename)
+
+                        self.extract_zipfile(filename,target)
+
+                elif (
+                    filename.endswith('.tar.gz')
+                    or filename.endswith('.tgz')):
+
+                    if self.tar_has_structure(filename):
+                    
+                        print('---> Estrutura antiga detectada')
+
+                        self.extract_tarfile(filename, destination )
+
+                    else:             
+                        print('---> Estrutura nova detectada')
+
+                        target = self.create_repo_target(distro,filename)
+
+                        self.extract_tarfile(filename,target)
+
             # verifica se o arquivo de checksums foi incluido no repositório
             catalogs,missing_catalogs=self.get_checksum_catalogs(distro)
             if (len(missing_catalogs) > 0):
@@ -438,9 +469,9 @@ class RepoCache():
     
     def get_checksum_catalogs(self, distro):
         basedir_system='/srv/www' + self.distros[distro]['install_path'].rstrip('/').rpartition('/')[0]
-        print(f'Install path: {basedir_system}')
+        # print(f'Install path: {basedir_system}')
         basedir_other=basedir_system.rstrip('/').rpartition('/')[0].rpartition('/')[0]
-        print(f'basedir_other: {basedir_other}')
+        # print(f'basedir_other: {basedir_other}')
       
         if distro not in self.distros.keys():
             print(f'*** {self.color("ERRO", "red")} ***: "{distro}" não consta da lista de distros conhecidas.')
@@ -466,16 +497,16 @@ class RepoCache():
                 else:
                     # print(os.path.basename(f['filename']).partition('-')[0])
                     repositorio = str(os.path.basename(f['filename']).partition('-')[0].partition('.')[0])
-                    print(f'Repositorio: {repositorio} , Distro {distro}')
+                    # print(f'Repositorio: {repositorio} , Distro {distro}')
                     
-                    if repositorio == "install" or repositorio == "backports":
-                            filename = os.path.join(os.path.join(basedir_other,"sistema",distro_path,os.path.basename(f['filename']).partition('-')[0].partition('.')[0]+'-x86_64'), 'CHECKSUMS')
-                    elif repositorio == "tmf":
-                            filename = os.path.join(os.path.join(basedir_other,"bb","tmf-ag"), 'CHECKSUMS')
-                    elif repositorio == "packagehub":
-                            filename = os.path.join(os.path.join(basedir_other,"sistema",distro_path,"SLE-Module-Packagehub-Subpackages-x86_64"), 'CHECKSUMS')
-                    else:
-                            filename = os.path.join(os.path.join(basedir_other,"bb",os.path.basename(f['filename']).partition('-')[0].partition('.')[0]), 'CHECKSUMS')
+                    # if repositorio == "install" or repositorio == "backports":
+                    #         filename = os.path.join(os.path.join(basedir_system,"sistema",distro_path,os.path.basename(f['filename']).partition('-')[0].partition('.')[0]+'-x86_64'), 'CHECKSUMS')
+                    # elif repositorio == "tmf":
+                    #         filename = os.path.join(os.path.join(basedir_system,"bb","tmf-ag"), 'CHECKSUMS')
+                    # elif repositorio == "packagehub":
+                    #         filename = os.path.join(os.path.join(basedir_system,"sistema",distro_path,"SLE-Module-Packagehub-Subpackages-x86_64"), 'CHECKSUMS')
+                    # else:
+                    #         filename = os.path.join(os.path.join(basedir_system,"bb",os.path.basename(f['filename']).partition('-')[0].partition('.')[0]), 'CHECKSUMS')
                     #         
                     # filename = os.path.join(os.path.join(basedir_other,os.path.basename(f['filename']).partition('-')[0].partition('.')[0]), 'CHECKSUMS')
                     filename = os.path.join(os.path.join(basedir_system,os.path.basename(f['filename']).partition('-')[0].partition('.')[0]), 'CHECKSUMS')
@@ -539,6 +570,88 @@ class RepoCache():
             for member in tf.getmembers():
                 files.append(member.name)
         return files
+
+    #
+    # Verifica se tem ou não a estrutura de diretório criada no ZIP
+    # 
+    def zip_has_structure(self, filename):
+        with zipfile.ZipFile(filename) as zf:
+
+            for member in zf.infolist():
+
+                path = member.filename.lstrip("/")
+
+                if (
+                    path.startswith("srv/")
+                    or path.startswith("etc/")
+                    or path.startswith("var/")
+                    or path.startswith("usr/")
+                ):
+                    return True
+
+        return False
+
+    #
+    # Verifica se tem ou não a estrutura de diretório criada no TAR
+    # 
+    def tar_has_structure(self, filename):
+        with tarfile.open(filename, mode='r:*') as tf:
+
+            for member in tf.getmembers():
+
+                path = member.name.lstrip("/")
+
+                if (
+                    path.startswith("srv/")
+                    or path.startswith("etc/")
+                    or path.startswith("var/")
+                    or path.startswith("usr/")
+                ):
+                    return True
+
+        return False
+
+    #
+    # Criar destino para pacotes novos
+    # 
+    def create_repo_target(self, distro, package_file):
+
+        basedir_system = (
+            '/srv/www'
+            + self.distros[distro]['install_path']
+                .rstrip('/')
+                .rpartition('/')[0]
+        )
+
+        package_name = (
+            os.path.basename(package_file)
+            .partition('.')[0]
+        )
+
+        targetdir = os.path.join(
+            basedir_system,
+            package_name
+        )
+
+        os.makedirs(
+            targetdir,
+            exist_ok=True
+        )
+
+        shutil.chown(
+            targetdir,
+            self.default_owner,
+            self.default_group
+        )
+
+        os.chmod(
+            targetdir,
+            self.default_mode
+        )
+
+        return targetdir
+
+    
                     
     def extract_zipfile(self, filename, destination):
         with zipfile.ZipFile(filename) as zf:
