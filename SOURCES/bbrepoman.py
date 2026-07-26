@@ -887,7 +887,166 @@ class RepoCache():
         print(f'* reiniciando serviço SLPD ({self.color("OK", "green")})')
             
         return True
-        
+    
+    #
+    #   Descobert do diretório de montagem 
+    #
+    def get_mount_target(self, distro, package_file):
+
+        basedir_system = (
+            '/srv/www'
+            + self.distros[distro]['install_path']
+                .rstrip('/')
+                .rpartition('/')[0]
+        )
+
+        package_name = (
+            os.path.basename(package_file)
+            .replace('.tar.gz', '')
+            .replace('.tgz', '')
+            .replace('.zip', '')
+            .replace('.tar', '')
+            .partition('-')[0]
+        )
+
+        mountpoint = os.path.join(basedir_system,package_name)
+        return mountpoint
+
+    #
+    # Criação da estrutura
+    #
+    def create_mount_target(self, mountpoint):
+
+        os.makedirs(mountpoint,exist_ok=True)
+
+        shutil.chown(mountpoint,self.default_owner,self.default_group)
+
+        os.chmod(mountpoint,self.default_mode)
+
+        return True
+
+    #
+    # Montagem efetiva
+    #
+    def mount_archive(self, archive, mountpoint):
+
+        try:
+
+            gid = subprocess.check_output(
+                [
+                    "/usr/bin/getent",
+                    "group",
+                    self.default_group
+                ]
+            ).decode().split(":")[2].strip()
+
+            uid = subprocess.check_output(
+                [
+                    "/usr/bin/id",
+                    "-u",
+                    self.default_owner
+                ]
+            ).decode().strip()
+
+            cmd = [
+                "/usr/bin/archivemount",
+                "-r",
+                "-o",
+                f"nobackup,nosave,uid={uid},gid={gid}",
+                archive,
+                mountpoint
+            ]
+
+            print(f'--> Montando {archive} em {mountpoint}')
+
+            result = subprocess.run(cmd,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+
+            if result.returncode != 0:
+                print(f'*** ERRO *** Falha ao montar {archive}')
+                print(result.stderr.decode())
+                return False
+            return True
+
+        except Exception as e:
+            print(f'*** ERRO *** {e}')
+            return False
+
+    #
+    # Método principal de montagem
+    #
+    def mount_all(self, distro):
+
+        if distro not in self.distros.keys():
+
+            print(
+                f'Distro {distro} não existe'
+            )
+
+            return False
+
+        print(
+            f'--> Processando "{distro}"'
+        )
+
+        for f in self.distros[distro]['files']:
+
+            archive = os.path.join(
+                self.distros[distro]['path'],
+                f['filename']
+            )
+
+            if archive.endswith('.zip'):
+
+                if self.zip_has_structure(archive):
+
+                    print(
+                        f'*** ERRO *** '
+                        f'{archive} utiliza estrutura antiga'
+                    )
+
+                    continue
+
+            elif (
+                archive.endswith('.tar.gz')
+                or archive.endswith('.tgz')
+                or archive.endswith('.tar')
+            ):
+
+                if self.tar_has_structure(archive):
+
+                    print(
+                        f'*** ERRO *** '
+                        f'{archive} utiliza estrutura antiga'
+                    )
+
+                    continue
+
+            else:
+                continue
+
+            mountpoint = self.get_mount_target(
+                distro,
+                archive
+            )
+
+            self.create_mount_target(mountpoint)
+            self.mount_archive(archive,mountpoint)
+
+        return True
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     def sync_repo(self, remote_addr):
         
         username = input(f'Usuário para {remote_addr}: ')
@@ -938,8 +1097,8 @@ class RepoCache():
 
 
 class BBRepoMan():
-    version = '2.0'
-    build = '202401124'
+    version = '3.0'
+    build = '20260724'
 
     def usage(self):
         print('Uso: ' + sys.argv[0] + ' [-l|--list] [-c|--verify-cache] [-v|--verify <repositório>|all] [-e|--extract <repositório>] [-r|--rescan] [-s|--setpermissions] [-d|--delete <repositorio>] [-S|--sync <servidor remoto>] [-V|--version]')
@@ -970,9 +1129,24 @@ class BBRepoMan():
 def main(): 
     
     bbr = BBRepoMan()
-    
     try:
-        opts, args = getopt.getopt(sys.argv[1:],  "Vhv:c:e:lrsd:S:", ["version", "help", "verify=", "verify-cache=", "extract=", "list", "rescan", "setpermissions", "delete", "sync="])
+        opts, args = getopt.getopt(
+            sys.argv[1:],
+            "Vhv:c:e:m:lrsd:S:",
+            [
+                "version",
+                "help",
+                "verify=",
+                "verify-cache=",
+                "extract=",
+                "mount=",
+                "list",
+                "rescan",
+                "setpermissions",
+                "delete",
+                "sync="
+            ]
+        )
     except getopt.GetoptError as err:
         print(err)
         bbr.usage()
@@ -1031,6 +1205,16 @@ def main():
                     c.extract_all(distro)
             # define permissões padrão
             c.set_permissions('/srv/www')
+        elif o in ("-m", "--mount"):
+            mount_repo = a
+            if mount_repo != '' and mount_repo != 'all':     
+                c.mount_all(mount_repo)
+            elif mount_repo == 'all':    
+                for distro in c.get_distro_list():           
+                    print(
+                        f'*** Montando arquivos para {distro}...'
+                    )
+                    c.mount_all(distro)
         elif o in ("-l", "--list"):
             c.list_distros()
         elif o in ("-r", "--rescan"):
