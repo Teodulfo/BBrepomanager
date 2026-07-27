@@ -230,6 +230,7 @@ class RepoCache():
     
             
     def color(self, text, color, bold=True):
+        text = str(text)
         esc = '\x1b['
         ret = ""
         if bold:
@@ -815,6 +816,21 @@ class RepoCache():
                     print(f"{item['filename']} é um diretório, pulando.")
                     continue
                 item['calculated_checksum'] = self.do_sha1sum(os.path.join(self.distros[distro_name]['path'], item['filename']))
+                #
+                # Não existe sha1 cadastado
+                #
+                if item['expected_checksum'] is None:
+
+                        print(
+                            f'*** Arquivo sha1 equivalente ao Arquivo '
+                            f'[{item["filename"]}] inexistente'
+                        )
+
+                        failed = True
+                        continue
+                #
+                # Compara checksums
+                # 
                 if item['calculated_checksum'] != item['expected_checksum']:
                     print(f"*** {self.color('INCORRETO', 'red')} *** (esperado: {self.color(item['expected_checksum'], 'yellow')}, calculado: {item['calculated_checksum']})")
                     failed = True
@@ -916,13 +932,32 @@ class RepoCache():
     # Criação da estrutura
     #
     def create_mount_target(self, mountpoint):
-
-        os.makedirs(mountpoint,exist_ok=True)
-
-        shutil.chown(mountpoint,self.default_owner,self.default_group)
-
-        os.chmod(mountpoint,self.default_mode)
-
+    
+        os.makedirs(
+            mountpoint,
+            exist_ok=True
+        )
+    
+        try:
+        
+            shutil.chown(
+                mountpoint,
+                self.default_owner,
+                self.default_group
+            )
+    
+            os.chmod(
+                mountpoint,
+                self.default_mode
+            )
+    
+        except OSError as e:
+        
+            print(
+                f'Aviso: não foi possível ajustar '
+                f'permissões em {mountpoint}: {e}'
+            )
+    
         return True
 
     #
@@ -1028,15 +1063,23 @@ class RepoCache():
                 distro,
                 archive
             )
+            if self.is_archive_mounted(mountpoint):
+                print(
+                    f'--> Desmontando montagem anterior {mountpoint}'
+                )
+                self.umount_archive(mountpoint)
 
-            self.create_mount_target(mountpoint)
+                if not self.umount_archive(mountpoint):
+                    continue
+
             
             if self.is_archive_mounted(mountpoint):
             
                 print(
                     f'--> Ponto de montagem já utilizado: {mountpoint}'
                 )
-            
+                self.umount_archive(mountpoint)
+                
                 if not self.umount_archive(mountpoint):
                 
                     print(
@@ -1044,6 +1087,8 @@ class RepoCache():
                     )
             
                     continue
+
+            self.create_mount_target(mountpoint)
                 
             self.mount_archive(
                 archive,
