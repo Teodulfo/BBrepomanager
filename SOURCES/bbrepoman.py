@@ -985,9 +985,8 @@ class RepoCache():
 
             cmd = [
                 "/usr/bin/archivemount",
-                "-r",
                 "-o",
-                f"nobackup,nosave,uid={uid},gid={gid}",
+                f"ro,allow_other,nobackup,nosave,uid={uid},gid={gid}",
                 archive,
                 mountpoint
             ]
