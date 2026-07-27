@@ -1273,6 +1273,7 @@ def main():
         
     c = RepoCache('/srv/www/cache')
     verify_repo = ''
+    exit_code = 0
     
     for o, a in opts:
         if o in ("-h", "--help"):
@@ -1285,19 +1286,24 @@ def main():
             verify_repo = a
             # tratamento para verify            
             if verify_repo != '' and verify_repo != 'all':
-                c.verify_cache_checksums(verify_repo)
+                if not c.verify_cache_checksums(verify_repo):
+                    exit_code = 1
+
                 c.write_metadata()
             elif verify_repo == 'all':
                 for distro in c.get_distro_list():
                     print(f"*** Verificando checksums para {distro}...")
-                    c.verify_cache_checksums(distro)
+                    if not c.verify_cache_checksums(distro):
+                        exit_code = 1
                     c.write_metadata()
             
         elif o in ("-v", "--verify"):
             verify_repo = a
             # tratamento para verify            
             if verify_repo != '' and verify_repo != 'all':
-                c.verify_checksums(verify_repo)
+                if not c.verify_checksums(verify_repo):
+                    exit_code = 1
+
                 c.write_metadata()
             elif verify_repo == 'all':
                 for distro in c.get_distro_list():
@@ -1308,7 +1314,8 @@ def main():
             extract_repo = a
             # tratamento para extract
             if extract_repo != '' and extract_repo != 'all':
-                c.extract_all(extract_repo)
+                if not c.extract_all(extract_repo):
+                    exit_code = 1
             elif extract_repo == 'all':
                 for distro in c.get_distro_list():
                     print(f"*** Extraindo arquivos para {distro}...")
@@ -1318,7 +1325,8 @@ def main():
         elif o in ("-m", "--mount"):
             mount_repo = a
             if mount_repo != '' and mount_repo != 'all':     
-                c.mount_all(mount_repo)
+                if not c.mount_all(mount_repo):
+                    exit_code = 1
             elif mount_repo == 'all':    
                 for distro in c.get_distro_list():           
                     print(
@@ -1343,7 +1351,8 @@ def main():
             clean_repo = a
             # tratamento para clean
             if clean_repo != '' and clean_repo != 'all':
-                c.delete_all(clean_repo)
+                if not c.delete_all(clean_repo):
+                    exit_code = 1
             elif clean_repo == 'all':
                 for distro in c.get_distro_list():
                     print(f"*** Apagando arquivos para {distro}...")
@@ -1352,9 +1361,13 @@ def main():
             assert False, "opção inválida"
 
         print('---> Finalizado.')
-    return
+    sys.exit(exit_code)
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        print(f"*** ERRO FATAL *** {e}")
+        sys.exit(1)
 
 
