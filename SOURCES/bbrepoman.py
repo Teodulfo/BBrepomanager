@@ -1030,19 +1030,84 @@ class RepoCache():
             )
 
             self.create_mount_target(mountpoint)
-            self.mount_archive(archive,mountpoint)
+            
+            if self.is_archive_mounted(mountpoint):
+            
+                print(
+                    f'--> Ponto de montagem já utilizado: {mountpoint}'
+                )
+            
+                if not self.umount_archive(mountpoint):
+                
+                    print(
+                        f'*** ERRO *** não foi possível desmontar {mountpoint}'
+                    )
+            
+                    continue
+                
+            self.mount_archive(
+                archive,
+                mountpoint
+            )
 
         return True
 
+    #
+    # Método de umount
+    #
+    def umount_archive(self, mountpoint):
 
+        try:
 
+            if not os.path.ismount(mountpoint):
+                return True
 
+            print(f'--> Desmontando {mountpoint}')
 
+            result = subprocess.run(
+                [
+                    "/usr/bin/fusermount",
+                    "-u",
+                    mountpoint
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
 
+            if result.returncode != 0:
 
+                print(
+                    f'*** ERRO *** Falha ao desmontar {mountpoint}'
+                )
 
+                print(result.stderr.decode())
 
+                return False
 
+            return True
+
+        except Exception as e:
+
+            print(
+                f'*** ERRO *** ao desmontar {mountpoint}: {e}'
+            )
+
+            return False
+
+    #
+    # Verificando Umount
+    #
+    def is_archive_mounted(self, mountpoint):
+    
+        result = subprocess.run(
+            [
+                "/usr/bin/mountpoint",
+                "-q",
+                mountpoint
+            ]
+        )
+    
+        return result.returncode == 0
 
 
 
